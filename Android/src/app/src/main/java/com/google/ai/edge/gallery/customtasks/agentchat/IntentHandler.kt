@@ -44,10 +44,13 @@ data class CreateCalendarEventParams(
   val end_time: String,
 )
 
+@JsonClass(generateAdapter = true) data class ShareTextParams(val title: String, val text: String)
+
 enum class IntentAction(val action: String) {
   SEND_EMAIL("send_email"),
   SEND_SMS("send_sms"),
   CREATE_CALENDAR_EVENT("create_calendar_event"),
+  SHARE_TEXT("share_text"),
   GET_CURRENT_DATE_AND_TIME("get_current_date_and_time");
 
   companion object {
@@ -130,6 +133,31 @@ object IntentHandler {
           }
         } catch (e: Exception) {
           Log.e(TAG, "Failed to parse create_calendar_event parameters: $parameters", e)
+          "failed"
+        }
+      }
+      IntentAction.SHARE_TEXT -> {
+        try {
+          val moshi = Moshi.Builder().build()
+          val jsonAdapter = moshi.adapter(ShareTextParams::class.java)
+          val params = jsonAdapter.fromJson(parameters)
+          if (params != null && params.text.isNotBlank()) {
+            val sendIntent =
+              Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, params.text)
+              }
+            val chooserTitle = params.title.ifBlank { "Share report" }
+            val shareIntent = Intent.createChooser(sendIntent, chooserTitle)
+            shareIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(shareIntent)
+            "succeeded"
+          } else {
+            Log.e(TAG, "Failed to parse share_text parameters or text is empty: $parameters")
+            "failed"
+          }
+        } catch (e: Exception) {
+          Log.e(TAG, "Failed to share text with parameters: $parameters", e)
           "failed"
         }
       }

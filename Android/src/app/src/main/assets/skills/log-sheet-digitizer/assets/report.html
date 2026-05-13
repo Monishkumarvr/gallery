@@ -1,0 +1,238 @@
+<!--
+@license
+Copyright 2026 Google LLC
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+==============================================================================
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Log Sheet Report</title>
+  <style>
+    :root {
+      --bg: #f6f7f8;
+      --panel: #ffffff;
+      --text: #172026;
+      --muted: #5e6a72;
+      --line: #d9dee2;
+      --accent: #176b87;
+      --warn: #9b4d00;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.45;
+    }
+
+    main {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+
+    header {
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+    }
+
+    h1 {
+      font-size: 22px;
+      margin: 0 0 4px;
+    }
+
+    h2 {
+      color: var(--accent);
+      font-size: 16px;
+      margin: 22px 0 8px;
+    }
+
+    .meta {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      overflow-x: auto;
+    }
+
+    table {
+      border-collapse: collapse;
+      min-width: 100%;
+      font-size: 13px;
+    }
+
+    th,
+    td {
+      border: 1px solid var(--line);
+      padding: 7px 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #eef3f5;
+      font-weight: 650;
+      white-space: nowrap;
+    }
+
+    ul {
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    li {
+      margin: 4px 0;
+    }
+
+    .low {
+      color: var(--warn);
+      font-weight: 650;
+    }
+
+    .empty {
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    @media (max-width: 640px) {
+      main {
+        padding: 12px;
+      }
+
+      h1 {
+        font-size: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main id="app">
+    <header>
+      <h1>Log Sheet Report</h1>
+      <div class="meta">Loading report...</div>
+    </header>
+  </main>
+
+  <script>
+    const STORAGE_KEY = 'log_sheet_digitizer_reports';
+
+    function text(value) {
+      return String(value ?? '');
+    }
+
+    function escapeHtml(value) {
+      return text(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function readReports() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+      } catch {
+        return [];
+      }
+    }
+
+    function list(items) {
+      const cleanItems = Array.isArray(items) ? items.map(text).filter(Boolean) : [];
+      if (!cleanItems.length) {
+        return '<p class="empty">None</p>';
+      }
+      return `<ul>${cleanItems.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`;
+    }
+
+    function renderHeaderFields(fields) {
+      const cleanFields = Array.isArray(fields) ? fields : [];
+      if (!cleanFields.length) {
+        return '<p class="empty">No header fields were extracted.</p>';
+      }
+      const rows = cleanFields.map((field) => {
+        const confidence = text(field.confidence || 'low');
+        const confidenceClass = confidence === 'low' ? 'low' : '';
+        return `<tr><td>${escapeHtml(field.label)}</td><td>${escapeHtml(field.value)}</td><td class="${confidenceClass}">${escapeHtml(confidence)}</td></tr>`;
+      });
+      return `<table><thead><tr><th>Field</th><th>Value</th><th>Confidence</th></tr></thead><tbody>${rows.join('')}</tbody></table>`;
+    }
+
+    function renderMainTable(report) {
+      const columns = Array.isArray(report.columns) ? report.columns : [];
+      const rows = Array.isArray(report.rows) ? report.rows : [];
+      if (!columns.length) {
+        return '<p class="empty">No table was extracted.</p>';
+      }
+      const header = columns.map((column) => `<th>${escapeHtml(column)}</th>`).join('');
+      const body = rows.map((row) => {
+        const cells = columns.map((_, index) => `<td>${escapeHtml((row || [])[index] || '')}</td>`).join('');
+        return `<tr>${cells}</tr>`;
+      });
+      return `<table><thead><tr>${header}</tr></thead><tbody>${body.join('')}</tbody></table>`;
+    }
+
+    function render() {
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get('id');
+      const reports = readReports();
+      const report = reports.find((item) => item.id === id) || reports[0];
+      const app = document.getElementById('app');
+
+      if (!report) {
+        app.innerHTML = '<header><h1>Log Sheet Report</h1><div class="meta">No report found.</div></header>';
+        return;
+      }
+
+      app.innerHTML = `
+        <header>
+          <h1>${escapeHtml(report.document_title || 'Log Sheet Report')}</h1>
+          <div class="meta">Saved locally on this device</div>
+        </header>
+        <section class="panel">
+          <h2>Summary</h2>
+          <p>${escapeHtml(report.summary || 'No summary was extracted.')}</p>
+          <h2>Header Fields</h2>
+          ${renderHeaderFields(report.header_fields)}
+          <h2>${escapeHtml(report.table_name || 'Extracted Table')}</h2>
+          ${renderMainTable(report)}
+          <h2>Key Findings</h2>
+          ${list(report.key_findings)}
+          <h2>Needs Review</h2>
+          ${list(report.needs_review)}
+          <h2>Source Quality</h2>
+          ${list(report.source_quality)}
+        </section>
+      `;
+    }
+
+    render();
+  </script>
+</body>
+</html>

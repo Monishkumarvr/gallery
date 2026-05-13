@@ -1,0 +1,130 @@
+<!--
+@license
+Copyright 2026 Google LLC
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+==============================================================================
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Database Chat History</title>
+  <style>
+    :root {
+      --bg: #f7f8fa;
+      --panel: #ffffff;
+      --line: #d9dee5;
+      --text: #16202a;
+      --muted: #607080;
+      --accent: #176b87;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.45;
+    }
+
+    main {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+
+    h1 {
+      font-size: 21px;
+      margin: 0 0 12px;
+    }
+
+    article {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      margin-bottom: 12px;
+      padding: 12px;
+    }
+
+    .meta {
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+
+    pre {
+      background: #f0f3f5;
+      border-radius: 6px;
+      color: #172026;
+      font-size: 12px;
+      margin: 0;
+      overflow-x: auto;
+      padding: 10px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .empty {
+      color: var(--muted);
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Database Chat Tool Calls</h1>
+    <section id="history"></section>
+  </main>
+
+  <script>
+    const HISTORY_KEY = 'database_chat_history';
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function readHistory() {
+      try {
+        return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+      } catch {
+        return [];
+      }
+    }
+
+    const history = readHistory();
+    const container = document.getElementById('history');
+    if (!history.length) {
+      container.innerHTML = '<p class="empty">No database calls yet.</p>';
+    } else {
+      container.innerHTML = history.map((entry) => `
+        <article>
+          <div class="meta">${escapeHtml(entry.timestamp)} · ${escapeHtml(entry.agent || 'gateway')} · ${escapeHtml(entry.action)}</div>
+          <pre>${escapeHtml(JSON.stringify(entry.result, null, 2))}</pre>
+        </article>
+      `).join('');
+    }
+  </script>
+</body>
+</html>

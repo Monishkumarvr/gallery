@@ -24,6 +24,7 @@ import android.os.Bundle
 import android.provider.OpenableColumns
 import android.util.Log
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Assignment
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Kitchen
 import androidx.compose.material.icons.outlined.LocalLibrary
@@ -108,6 +109,18 @@ val TRYOUT_CHIPS: List<SkillTryOutChip> =
       label = "Query Wikipedia",
       prompt = "Check Wikipedia about Oscars 2026. Tell me who won the best picture.",
       skillName = "query-wikipedia",
+    ),
+    SkillTryOutChip(
+      icon = Icons.Outlined.LocalLibrary,
+      label = "DB Chat",
+      prompt = "Using the postgres database agent, count the recent heats and summarize the result.",
+      skillName = "database-chat",
+    ),
+    SkillTryOutChip(
+      icon = Icons.Outlined.Assignment,
+      label = "Log Sheet",
+      prompt = "Digitize this log sheet from the attached photo and prepare a shareable report.",
+      skillName = "log-sheet-digitizer",
     ),
     SkillTryOutChip(
       icon = Icons.Outlined.QrCode,

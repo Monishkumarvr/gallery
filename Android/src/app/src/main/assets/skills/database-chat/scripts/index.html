@@ -1,0 +1,151 @@
+<!--
+@license
+Copyright 2026 Google LLC
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+==============================================================================
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<body>
+  <script>
+    const HISTORY_KEY = 'database_chat_history';
+    const VALID_AGENTS = new Set(['postgres', 'mongo']);
+
+    function parseGatewayConfig(secret) {
+      const raw = String(secret || '').trim();
+      if (!raw) {
+        throw new Error('Database gateway config is required.');
+      }
+
+      let config;
+      if (raw.startsWith('{')) {
+        config = JSON.parse(raw);
+      } else {
+        config = { baseUrl: raw };
+      }
+
+      const baseUrl = String(config.baseUrl || config.url || '').trim().replace(/\/+$/, '');
+      if (!baseUrl) {
+        throw new Error('Gateway config must include baseUrl.');
+      }
+
+      return {
+        baseUrl,
+        token: String(config.token || config.apiToken || config.bearerToken || '').trim()
+      };
+    }
+
+    function readHistory() {
+      try {
+        return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+      } catch {
+        return [];
+      }
+    }
+
+    function saveHistory(entry) {
+      const history = readHistory();
+      history.unshift({ ...entry, timestamp: new Date().toISOString() });
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, 50)));
+    }
+
+    function assertAgent(agent) {
+      if (!VALID_AGENTS.has(agent)) {
+        throw new Error(`Invalid database agent: ${agent}`);
+      }
+    }
+
+    async function requestJson(config, path, options = {}) {
+      const headers = {
+        'content-type': 'application/json',
+        ...(options.headers || {})
+      };
+      if (config.token) {
+        headers.authorization = `Bearer ${config.token}`;
+      }
+
+      const response = await fetch(`${config.baseUrl}${path}`, {
+        ...options,
+        headers
+      });
+      const text = await response.text();
+      let body;
+      try {
+        body = text ? JSON.parse(text) : {};
+      } catch {
+        body = { raw: text };
+      }
+      if (!response.ok) {
+        throw new Error(body.error || `Gateway request failed with HTTP ${response.status}`);
+      }
+      return body;
+    }
+
+    function pretty(value) {
+      return JSON.stringify(value, null, 2);
+    }
+
+    window['ai_edge_gallery_get_result'] = async (dataStr, secret) => {
+      try {
+        const config = parseGatewayConfig(secret);
+        const input = JSON.parse(dataStr || '{}');
+        const action = String(input.action || '').trim();
+
+        if (action === 'health') {
+          const result = await requestJson(config, '/api/mobile/health', { method: 'GET' });
+          saveHistory({ action, result });
+          return JSON.stringify({ result: pretty(result) });
+        }
+
+        if (action === 'schema') {
+          const agent = String(input.agent || '').trim();
+          assertAgent(agent);
+          const result = await requestJson(config, '/api/mobile/schema', {
+            method: 'POST',
+            body: JSON.stringify({ agent })
+          });
+          saveHistory({ action, agent, result });
+          return JSON.stringify({ result: pretty(result) });
+        }
+
+        if (action === 'query') {
+          const agent = String(input.agent || '').trim();
+          assertAgent(agent);
+          if (!input.request || typeof input.request !== 'object') {
+            throw new Error('query action requires a request object.');
+          }
+          const result = await requestJson(config, '/api/mobile/query', {
+            method: 'POST',
+            body: JSON.stringify({ agent, request: input.request })
+          });
+          saveHistory({ action, agent, request: input.request, result });
+          return JSON.stringify({
+            result: pretty(result),
+            webview: {
+              url: 'history.html',
+              iframe: false,
+              aspectRatio: 0.85
+            }
+          });
+        }
+
+        throw new Error(`Unsupported action: ${action}`);
+      } catch (e) {
+        return JSON.stringify({ error: `Database Chat error: ${e.message}` });
+      }
+    };
+  </script>
+</body>
+</html>

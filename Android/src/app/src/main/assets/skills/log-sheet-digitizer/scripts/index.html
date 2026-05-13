@@ -1,0 +1,163 @@
+<!--
+@license
+Copyright 2026 Google LLC
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+==============================================================================
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<body>
+  <script>
+    const STORAGE_KEY = 'log_sheet_digitizer_reports';
+
+    function readReports() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+      } catch {
+        return [];
+      }
+    }
+
+    function saveReports(reports) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
+    }
+
+    function cleanString(value) {
+      return typeof value === 'string' ? value.trim() : '';
+    }
+
+    function normalizeArray(value) {
+      return Array.isArray(value) ? value : [];
+    }
+
+    function confidenceLabel(value) {
+      const confidence = cleanString(value).toLowerCase();
+      if (confidence === 'high' || confidence === 'medium' || confidence === 'low') {
+        return confidence;
+      }
+      return 'low';
+    }
+
+    function escapeMarkdownCell(value) {
+      return String(value ?? '').replace(/\|/g, '\\|').replace(/\n/g, ' ');
+    }
+
+    function markdownTable(columns, rows) {
+      if (!columns.length) {
+        return '_No table columns were extracted._';
+      }
+      const header = `| ${columns.map(escapeMarkdownCell).join(' | ')} |`;
+      const separator = `| ${columns.map(() => '---').join(' | ')} |`;
+      const body = rows.map((row) => {
+        const cells = columns.map((_, index) => escapeMarkdownCell(row[index] ?? ''));
+        return `| ${cells.join(' | ')} |`;
+      });
+      return [header, separator, ...body].join('\n');
+    }
+
+    function listOrFallback(items, fallback) {
+      const cleanItems = normalizeArray(items).map(cleanString).filter(Boolean);
+      return cleanItems.length ? cleanItems.map((item) => `- ${item}`).join('\n') : fallback;
+    }
+
+    function formatReport(report) {
+      const title = cleanString(report.document_title) || 'Log Sheet Report';
+      const summary = cleanString(report.summary) || 'No summary was extracted.';
+      const headerFields = normalizeArray(report.header_fields);
+      const columns = normalizeArray(report.columns).map(cleanString).filter(Boolean);
+      const rows = normalizeArray(report.rows).map((row) => normalizeArray(row));
+      const tableName = cleanString(report.table_name) || 'Extracted Table';
+
+      const headers = headerFields.length
+        ? headerFields.map((field) => {
+            const label = cleanString(field.label) || 'Field';
+            const value = cleanString(field.value) || '[blank]';
+            const confidence = confidenceLabel(field.confidence);
+            return `- ${label}: ${value} (${confidence} confidence)`;
+          }).join('\n')
+        : '_No header fields were extracted._';
+
+      return [
+        `# ${title}`,
+        '',
+        `Generated: ${new Date().toLocaleString()}`,
+        '',
+        '## Summary',
+        summary,
+        '',
+        '## Header Fields',
+        headers,
+        '',
+        `## ${tableName}`,
+        markdownTable(columns, rows),
+        '',
+        '## Key Findings',
+        listOrFallback(report.key_findings, '_No key findings were identified._'),
+        '',
+        '## Needs Review',
+        listOrFallback(report.needs_review, '_No review items were flagged._'),
+        '',
+        '## Source Quality',
+        listOrFallback(report.source_quality, '_No source quality notes were provided._')
+      ].join('\n');
+    }
+
+    window['ai_edge_gallery_get_result'] = async (dataStr) => {
+      try {
+        const input = JSON.parse(dataStr || '{}');
+        const action = cleanString(input.action || 'save_report');
+        if (action !== 'save_report') {
+          throw new Error(`Unsupported action: ${action}`);
+        }
+
+        const report = {
+          id: `${Date.now()}`,
+          document_title: cleanString(input.document_title) || 'Log Sheet Report',
+          captured_at_iso: cleanString(input.captured_at_iso),
+          summary: cleanString(input.summary),
+          header_fields: normalizeArray(input.header_fields).map((field) => ({
+            label: cleanString(field.label),
+            value: cleanString(field.value),
+            confidence: confidenceLabel(field.confidence),
+            raw_text: cleanString(field.raw_text)
+          })),
+          table_name: cleanString(input.table_name) || 'Extracted Table',
+          columns: normalizeArray(input.columns).map(cleanString),
+          rows: normalizeArray(input.rows).map((row) => normalizeArray(row).map((cell) => String(cell ?? ''))),
+          key_findings: normalizeArray(input.key_findings).map(cleanString).filter(Boolean),
+          needs_review: normalizeArray(input.needs_review).map(cleanString).filter(Boolean),
+          source_quality: normalizeArray(input.source_quality).map(cleanString).filter(Boolean)
+        };
+
+        const formattedReport = formatReport(report);
+        const reports = readReports();
+        reports.unshift({ ...report, formatted_report: formattedReport });
+        saveReports(reports.slice(0, 25));
+
+        return JSON.stringify({
+          result: formattedReport,
+          webview: {
+            url: `report.html?id=${encodeURIComponent(report.id)}`,
+            iframe: false,
+            aspectRatio: 0.75
+          }
+        });
+      } catch (e) {
+        return JSON.stringify({ error: `Log Sheet Digitizer error: ${e.message}` });
+      }
+    };
+  </script>
+</body>
+</html>
