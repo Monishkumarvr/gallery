@@ -14,6 +14,8 @@ Use this skill when the user asks questions about production, foundry, Postgres,
 
 The local on-device model is the reasoning agent. The backend is only a read-only tool gateway. Never ask the backend to generate an answer. Never send database credentials.
 
+If the user only greets the database agent, asks what this skill can do, or asks for setup/status without requesting database facts, answer directly without calling `run_js`.
+
 ### Agent selection
 
 - Use `postgres` for foundry production schema questions such as heats, castings, energy readings, breakdowns, inventory, furnaces, ladles, grades, tests, customers, users, shifts, or QuerySpec questions.
