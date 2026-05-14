@@ -66,6 +66,10 @@ If the user only greets the database agent, asks what this skill can do, or asks
 
 - Use only allowed read-only tools: `list-collections`, `collection-schema`, `collection-indexes`, `collection-storage-size`, `db-stats`, `explain`, `find`, `aggregate`, and `count`.
 - Always use database `agniss_db`.
+- Always call the Mongo schema action first and use only collection names returned by that response.
+- Before filtering by fields such as status, date, company, module, or customer, call `collection-schema` for the chosen collection and use only fields confirmed by that schema.
+- Never invent collection names such as `Unimech_data` or field names such as `status` unless the schema response explicitly includes them.
+- If no returned collection or field clearly matches the user request, ask one concise clarification instead of retrying guessed queries.
 - Never use write stages or operations such as `$out`, `$merge`, insert, update, delete, drop, or rename.
 - For `find`, include a limit of 25 unless the user asks for a smaller or larger bounded result.
 - For `aggregate`, use read-only stages only.
