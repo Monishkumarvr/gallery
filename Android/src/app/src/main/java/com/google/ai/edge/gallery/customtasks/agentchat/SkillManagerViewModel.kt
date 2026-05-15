@@ -113,7 +113,13 @@ val TRYOUT_CHIPS: List<SkillTryOutChip> =
     SkillTryOutChip(
       icon = Icons.Outlined.LocalLibrary,
       label = "DB Chat",
-      prompt = "Using the postgres database agent, count the recent heats and summarize the result.",
+      prompt = "Using the postgres database agent, list available tables.",
+      skillName = "database-chat",
+    ),
+    SkillTryOutChip(
+      icon = Icons.Outlined.LocalLibrary,
+      label = "Mongo Data",
+      prompt = "Using the mongo database agent, list available collections.",
       skillName = "database-chat",
     ),
     SkillTryOutChip(

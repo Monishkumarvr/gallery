@@ -94,7 +94,7 @@ limitations under the License.
     }
 
     function pretty(value) {
-      return JSON.stringify(value, null, 2);
+      return JSON.stringify(value);
     }
 
     window['ai_edge_gallery_get_result'] = async (dataStr, secret) => {
@@ -117,6 +117,21 @@ limitations under the License.
             body: JSON.stringify({ agent })
           });
           saveHistory({ action, agent, result });
+          return JSON.stringify({ result: pretty(result) });
+        }
+
+        if (action === 'schemaDetail') {
+          const agent = String(input.agent || '').trim();
+          assertAgent(agent);
+          const entity = String(input.entity || input.table || input.collection || '').trim();
+          if (!entity) {
+            throw new Error('schemaDetail action requires entity, table, or collection.');
+          }
+          const result = await requestJson(config, '/api/mobile/schema/detail', {
+            method: 'POST',
+            body: JSON.stringify({ agent, entity })
+          });
+          saveHistory({ action, agent, entity, result });
           return JSON.stringify({ result: pretty(result) });
         }
 
